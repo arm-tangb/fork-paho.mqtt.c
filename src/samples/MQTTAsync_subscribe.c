@@ -29,9 +29,20 @@
 #include <OsWrapper.h>
 #endif
 
-#define ADDRESS     "tcp://mqtt.eclipse.org:1883"
-#define CLIENTID    "ExampleClientSub"
+#define DBG_AIOT
+
+#if defined(DBG_AIOT)
+#define ADDRESS     "b1qcqqib9FN.iot-as-mqtt.cn-shanghai.aliyuncs.com:1883"
+#define CLIENTID    "MY_GW_20210401&b1qcqqib9FN|timestamp=2524608000000,_v=paho-c-1.0.0,securemode=3,signmethod=hmacsha256,lan=C|"
+#define TOPIC       "/b1qcqqib9FN/MY_GW_20210401/get"
+#define USERNAME	"MY_GW_20210401&b1qcqqib9FN"
+#define PASSWORD	"2C1AAA3B49EAC1DD691B7E7ADED387A823BA74A44E4189A8C0C5B1BB363A4D34"
+#else
+#define ADDRESS     "tcp://broker.emqx.io:1883"
+#define CLIENTID    "MY_GW_20210401&b1qcqqib9FN|timestamp=2524608000000,_v=paho-c-1.0.0,securemode=3,signmethod=hmacsha256,lan=C|"
 #define TOPIC       "MQTT Examples"
+#endif
+
 #define PAYLOAD     "Hello World!"
 #define QOS         1
 #define TIMEOUT     10000L
@@ -98,7 +109,7 @@ void onSubscribeFailure(void* context, MQTTAsync_failureData* response)
 
 void onConnectFailure(void* context, MQTTAsync_failureData* response)
 {
-	printf("Connect failed, rc %d\n", response->code);
+	printf("Connect failed, rc %d.%s\n", response->code, response->message);
 	finished = 1;
 }
 
@@ -123,6 +134,11 @@ void onConnect(void* context, MQTTAsync_successData* response)
 	}
 }
 
+void trace_callback(enum MQTTASYNC_TRACE_LEVELS level, char* message)
+{
+    if (strstr(message, "onnect") && !strstr(message, "isconnect"))
+        printf("Trace : %d, %s\n", level, message);
+}
 
 int main(int argc, char* argv[])
 {
@@ -131,6 +147,9 @@ int main(int argc, char* argv[])
 	MQTTAsync_disconnectOptions disc_opts = MQTTAsync_disconnectOptions_initializer;
 	int rc;
 	int ch;
+
+	MQTTAsync_setTraceCallback(trace_callback);
+	MQTTAsync_setTraceLevel(MQTTASYNC_TRACE_MAXIMUM);
 
 	if ((rc = MQTTAsync_create(&client, ADDRESS, CLIENTID, MQTTCLIENT_PERSISTENCE_NONE, NULL))
 			!= MQTTASYNC_SUCCESS)
@@ -151,6 +170,11 @@ int main(int argc, char* argv[])
 	conn_opts.cleansession = 1;
 	conn_opts.onSuccess = onConnect;
 	conn_opts.onFailure = onConnectFailure;
+	conn_opts.MQTTVersion = MQTTVERSION_3_1;
+#if defined(DBG_AIOT)
+	conn_opts.username = USERNAME;
+	conn_opts.password = PASSWORD;
+#endif
 	conn_opts.context = client;
 	if ((rc = MQTTAsync_connect(client, &conn_opts)) != MQTTASYNC_SUCCESS)
 	{
